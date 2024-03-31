@@ -14,10 +14,6 @@ LMDB using the Zig build system. Includes Ziggified bindings.
 const std = @import("std");
 const lmdb = @import("lmdb");
 
-/// 
-const std = @import("std");
-const lmdb = @import("lmdb");
-
 pub fn main() !void {
     const db_path = "/tmp/example-db";
 
