@@ -2,9 +2,7 @@ const std = @import("std");
 const lmdb = @import("lmdb");
 
 pub fn main() !void {
-    std.testing.refAllDeclsRecursive(lmdb);
-
-    const db_path = "/tmp/ramdisk/example-db";
+    const db_path = "/tmp/example-db";
 
     try std.fs.cwd().makePath(db_path);
 
@@ -15,44 +13,48 @@ pub fn main() !void {
     });
     defer env.close();
 
-    const db = try createDatabase(env, .{
-        .name = "people",
-        .flags = .{ .create = true },
-    });
-    defer db.close(env);
+    {
+        var txn = try env.beginTransaction(.{});
+        defer txn.abort();
+
+        const db = try txn.openDatabase(.{ .name = "people", .flags = .{ .create = true } });
+        defer db.close(env);
+        try txn.clearDatabase(db);
+
+        // prints 'null':
+        std.debug.print("value: {?s}\n", .{try txn.get(db, "James T. Kirk")});
+        std.debug.print("value: {?s}\n", .{try txn.get(db, "Jean-Luc Picard")});
+        std.debug.print("value: {?s}\n", .{try txn.get(db, "Luke Skywalker")});
+        std.debug.print("value: {?s}\n", .{try txn.get(db, "Darth Vader")});
+
+        // insert values into the database:
+        try txn.put(db, "James T. Kirk", "Star Trek");
+        try txn.put(db, "Luke Skywalker", "Star Wars");
+
+        // conditionally insert
+        if (try txn.getOrPut(db, "Luke Skywalker", "Star Wars IV")) |previous| {
+            std.debug.print("found existing: {s}\n", .{previous});
+        }
+
+        // reserve space before inserting:
+        const reserved = try txn.reserve(db, "Jean-Luc Picard", 9);
+        @memcpy(reserved, "Star Trek");
+
+        // read back the inserted values:
+        std.debug.print("value: {?s}\n", .{try txn.get(db, "James T. Kirk")});
+        std.debug.print("value: {?s}\n", .{try txn.get(db, "Jean-Luc Picard")});
+        std.debug.print("value: {?s}\n", .{try txn.get(db, "Luke Skywalker")});
+        std.debug.print("value: {?s}\n", .{try txn.get(db, "Darth Vader")});
+
+        // commit the changes to the database
+        try txn.commit();
+    }
 
     const random = try createDatabase(env, .{
         .name = "random",
         .flags = .{ .create = true },
     });
     defer random.close(env);
-
-    {
-        var txn = try env.beginTransaction(.{});
-        defer txn.abort();
-
-        std.debug.print("value: {?s}\n", .{try txn.get(db, "James T. Kirk")});
-        std.debug.print("value: {?s}\n", .{try txn.get(db, "Jean-Luc Picard")});
-        std.debug.print("value: {?s}\n", .{try txn.get(db, "Luke Skywalker")});
-        std.debug.print("value: {?s}\n", .{try txn.get(db, "Darth Vader")});
-
-        try txn.put(db, "James T. Kirk", "Star Trek");
-        try txn.put(db, "Luke Skywalker", "Star Wars");
-
-        if (try txn.getOrPut(db, "Luke Skywalker", "Star Wars IV")) |previous| {
-            std.debug.print("found existing: {s}\n", .{previous});
-        }
-
-        const reserved = try txn.reserve(db, "Jean-Luc Picard", 9);
-        @memcpy(reserved, "Star Trek");
-
-        std.debug.print("value: {?s}\n", .{try txn.get(db, "James T. Kirk")});
-        std.debug.print("value: {?s}\n", .{try txn.get(db, "Jean-Luc Picard")});
-        std.debug.print("value: {?s}\n", .{try txn.get(db, "Luke Skywalker")});
-        std.debug.print("value: {?s}\n", .{try txn.get(db, "Darth Vader")});
-
-        try txn.commit();
-    }
 
     {
         const inserts: u64 = 100_000;

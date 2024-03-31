@@ -268,6 +268,16 @@ pub const Transaction = struct {
 
     pub const openDatabase = Database.open;
 
+    /// Delete all pairs in the database.
+    pub fn clearDatabase(txn: Transaction, db: Database) !void {
+        try check(c.mdb_drop(txn.handle, db.handle, 0));
+    }
+
+    /// Drop and close the database.
+    pub fn dropDatabase(txn: Transaction, db: Database) !void {
+        try check(c.mdb_drop(txn.handle, db.handle, 1));
+    }
+
     /// Get a value stored in the database.
     pub fn get(txn: Transaction, db: Database, key: []const u8) !?[]const u8 {
         var key_val = c.MDB_val{
