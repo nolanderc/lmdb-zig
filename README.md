@@ -68,3 +68,5 @@ pub fn main() !void {
     }
 }
 ```
+
+It is also possible to use the raw C bindings under `@import("lmdb").c`
